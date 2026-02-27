@@ -1,5 +1,6 @@
 #include <android/log.h>
 #include <jni.h>
+#include <opencv2/core/ocl.hpp>
 #include <opencv2/opencv.hpp>
 #include <opencv2/stitching.hpp>
 #include <opencv2/stitching/detail/blenders.hpp>
@@ -75,12 +76,19 @@ Java_com_mandreshope_sary360_stitching_NativeStitcher_stitchImages(
     return -1; // Not enough images to stitch
   }
 
+  // Disable OpenCL to avoid driver hangs on Android
+  cv::ocl::setUseOpenCL(false);
+
   cv::Mat pano;
   cv::Ptr<cv::Stitcher> stitcher = cv::Stitcher::create(cv::Stitcher::PANORAMA);
 
-  // Force ORB with a low number of features (fast) instead of heavy default
-  // (possibly SIFT)
-  stitcher->setFeaturesFinder(cv::ORB::create(300));
+  // Use SIFT with a low cap on features. OpenCV's Stitcher matcher expects
+  // floating-point descriptors (SIFT/SURF). Using ORB (binary) causes Flann
+  // matcher crashes/hangs on some devices.
+  auto finder = cv::SIFT::create();
+  finder->setNFeatures(
+      300); // Cap features to avoid N^2 matching explosion with 60 images
+  stitcher->setFeaturesFinder(finder);
 
   // Configure stitcher for extreme performance (mandatory for 50+ images on
   // Android)
@@ -89,9 +97,8 @@ Java_com_mandreshope_sary360_stitching_NativeStitcher_stitchImages(
   stitcher->setCompositingResol(0.6); // Compress final panorama to ~0.6
                                       // Megapixels (~900x600) max internally
   stitcher->setPanoConfidenceThresh(0.3); // High tolerance for missed linkages
-  stitcher->setWaveCorrection(
-      true); // RE-ENABLED: the panorama needs a straight horizon to make the
-             // sphere perfect!
+  stitcher->setWaveCorrection(false);     // MUST remain false, wave correction
+                                          // hangs on 50+ images on mobile
 
   // Massive speedups for many images (bypasses slow GraphCut processing):
   stitcher->setSeamFinder(cv::makePtr<cv::detail::VoronoiSeamFinder>());
