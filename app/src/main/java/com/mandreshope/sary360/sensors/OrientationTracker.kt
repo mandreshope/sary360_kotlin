@@ -28,12 +28,21 @@ class OrientationTracker(
             val rotationMatrix = FloatArray(9)
             SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
 
+            // Remap coordinate system for a device held in portrait (back camera facing forward)
+            val remappedMatrix = FloatArray(9)
+            SensorManager.remapCoordinateSystem(
+                rotationMatrix,
+                SensorManager.AXIS_X,
+                SensorManager.AXIS_Z,
+                remappedMatrix
+            )
+
             val orientation = FloatArray(3)
-            SensorManager.getOrientation(rotationMatrix, orientation)
+            SensorManager.getOrientation(remappedMatrix, orientation)
 
             // Convert to degrees
-            var yaw = Math.toDegrees(orientation[0].toDouble()).toFloat()
-            val pitch = Math.toDegrees(orientation[1].toDouble()).toFloat()
+            var yaw = Math.toDegrees(orientation[0].toDouble()).toFloat() // Azimuth
+            val pitch = Math.toDegrees(orientation[1].toDouble()).toFloat() // Pitch
 
             // Normalize yaw to 0-360
             if (yaw < 0) yaw += 360f

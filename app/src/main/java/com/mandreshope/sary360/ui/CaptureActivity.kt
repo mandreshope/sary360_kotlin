@@ -36,6 +36,9 @@ class CaptureActivity : AppCompatActivity() {
     private var isSessionActive = false
     private val capturedImages = mutableListOf<String>()
 
+    private var baseYaw: Float? = null
+    private var basePitch: Float? = null
+
     private lateinit var sessionFolder: File
 
     data class ShotPoint(val yaw: Float, val pitch: Float)
@@ -79,6 +82,9 @@ class CaptureActivity : AppCompatActivity() {
         isSessionActive = true
         currentShotIndex = 0
         capturedImages.clear()
+        
+        baseYaw = null
+        basePitch = null
 
         val timestamp = System.currentTimeMillis()
         sessionFolder = File(getExternalFilesDir("photospheres"), "session_$timestamp")
@@ -112,10 +118,14 @@ class CaptureActivity : AppCompatActivity() {
     private fun onOrientationChanged(yaw: Float, pitch: Float, roll: Float) {
         if (!isSessionActive) return
 
-        val target = shotPlan[currentShotIndex]
-        val reached = isWithinTolerance(yaw, pitch, target.yaw, target.pitch)
+        if (baseYaw == null) baseYaw = yaw
 
-        binding.captureOverlay.updateOrientation(yaw, pitch)
+        val relativeYaw = normalizeAngle(yaw - baseYaw!!)
+
+        val target = shotPlan[currentShotIndex]
+        val reached = isWithinTolerance(relativeYaw, pitch, target.yaw, target.pitch)
+
+        binding.captureOverlay.updateOrientation(relativeYaw, pitch)
         binding.captureOverlay.setTarget(target.yaw, target.pitch, reached)
 
         if (reached) {
@@ -124,9 +134,13 @@ class CaptureActivity : AppCompatActivity() {
     }
 
     private fun isWithinTolerance(y1: Float, p1: Float, y2: Float, p2: Float): Boolean {
-        val dy = Math.abs(normalizeAngle(y1 - y2))
         val dp = Math.abs(p1 - p2)
-        return dy < 3f && dp < 3f
+        if (Math.abs(p2) >= 80f) {
+            // Near zenith or nadir, yaw doesn't matter, just rely on pitch
+            return dp < 5f
+        }
+        val dy = Math.abs(normalizeAngle(y1 - y2))
+        return dy < 5f && dp < 5f
     }
 
     private fun normalizeAngle(angle: Float): Float {

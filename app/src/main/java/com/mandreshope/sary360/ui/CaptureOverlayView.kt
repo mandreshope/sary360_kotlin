@@ -43,6 +43,9 @@ class CaptureOverlayView @JvmOverloads constructor(
         val scale = width / 60f // Assuming a ~60 degree horizontal FOV
 
         var deltaYaw = normalizeAngle(targetYaw - currentYaw)
+        if (Math.abs(targetPitch) >= 80f) {
+            deltaYaw = 0f // Keep the dot centered horizontally for zenith/nadir
+        }
         // If phones are held in portrait, yaw corresponds to X. If held in landscape, we might need rotation. 
         // We assume portrait for now and simple panning
         
