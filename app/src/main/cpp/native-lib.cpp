@@ -9,7 +9,25 @@
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
-extern "C" JNIEXPORT jint JNICALL
+extern "C" {
+
+JNIEXPORT void JNICALL
+Java_com_mandreshope_sary360_renderer_SphereRenderer_drawFrame(JNIEnv *env, jobject thiz) {
+    // TODO: Implement rendering logic here
+}
+
+JNIEXPORT void JNICALL
+Java_com_mandreshope_sary360_renderer_SphereRenderer_surfaceChanged(JNIEnv *env, jobject thiz, jint width,
+                                                                  jint height) {
+    // TODO: Implement surface changed logic here
+}
+
+JNIEXPORT void JNICALL
+Java_com_mandreshope_sary360_renderer_SphereRenderer_surfaceCreated(JNIEnv *env, jobject thiz) {
+    // TODO: Implement surface created logic here
+}
+
+JNIEXPORT jint JNICALL
 Java_com_mandreshope_sary360_stitching_NativeStitcher_stitchImages(
         JNIEnv* env,
         jobject /* this */,
@@ -23,7 +41,7 @@ Java_com_mandreshope_sary360_stitching_NativeStitcher_stitchImages(
     for (int i = 0; i < numImages; ++i) {
         jstring pathStr = (jstring)env->GetObjectArrayElement(imagePaths, i);
         const char* path = env->GetStringUTFChars(pathStr, nullptr);
-        
+
         cv::Mat img = cv::imread(path);
         if (img.empty()) {
             LOGE("Could not read image: %s", path);
@@ -46,10 +64,10 @@ Java_com_mandreshope_sary360_stitching_NativeStitcher_stitchImages(
 
     cv::Mat pano;
     cv::Ptr<cv::Stitcher> stitcher = cv::Stitcher::create(cv::Stitcher::PANORAMA);
-    
-    // Configure stitcher for spherical mode (default for PANORAMA often works, 
+
+    // Configure stitcher for spherical mode (default for PANORAMA often works,
     // but we can be explicit if using the detailed API)
-    
+
     LOGD("Starting stitching of %zu images...", imgs.size());
     cv::Stitcher::Status status = stitcher->stitch(imgs, pano);
 
@@ -63,4 +81,6 @@ Java_com_mandreshope_sary360_stitching_NativeStitcher_stitchImages(
     env->ReleaseStringUTFChars(outputPath, outPath);
 
     return success ? 0 : -2; // -2 if save fails
+}
+
 }

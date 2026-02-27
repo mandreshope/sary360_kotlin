@@ -9,6 +9,12 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <com.mandreshope.sary360.ui.CaptureOverlayView
+        android:id="@+id/captureOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/txtStatus"
         android:layout_width="wrap_content"

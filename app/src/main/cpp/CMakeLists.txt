@@ -15,3 +15,6 @@ target_link_libraries(sary360_native
     android
     log
 )
+
+# Add linker flag for 16KB page size alignment
+target_link_options(sary360_native PRIVATE "-Wl,-z,max-page-size=16384")

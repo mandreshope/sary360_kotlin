@@ -85,6 +85,8 @@ class CaptureActivity : AppCompatActivity() {
         sessionFolder.mkdirs()
 
         binding.btnStart.visibility = View.GONE
+        binding.captureOverlay.visibility = View.VISIBLE
+        binding.captureOverlay.isSessionActive = true
         updateUI()
     }
 
@@ -113,9 +115,8 @@ class CaptureActivity : AppCompatActivity() {
         val target = shotPlan[currentShotIndex]
         val reached = isWithinTolerance(yaw, pitch, target.yaw, target.pitch)
 
-        // TODO: Add captureOverlay to the layout
-        // binding.captureOverlay.updateOrientation(yaw, pitch)
-        // binding.captureOverlay.setTarget(target.yaw, target.pitch, reached)
+        binding.captureOverlay.updateOrientation(yaw, pitch)
+        binding.captureOverlay.setTarget(target.yaw, target.pitch, reached)
 
         if (reached) {
             takePhoto()
@@ -139,6 +140,7 @@ class CaptureActivity : AppCompatActivity() {
         val imageCapture = imageCapture ?: return
         // Pause taking photos to prevent multiple captures for the same point
         isSessionActive = false
+        binding.captureOverlay.isSessionActive = false
 
         val photoFile = File(sessionFolder, "shot_${currentShotIndex}.jpg")
         val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
@@ -152,6 +154,7 @@ class CaptureActivity : AppCompatActivity() {
 
                     if (currentShotIndex < shotPlan.size) {
                         isSessionActive = true
+                        binding.captureOverlay.isSessionActive = true
                         updateUI()
                     } else {
                         finishCapture()
@@ -161,6 +164,7 @@ class CaptureActivity : AppCompatActivity() {
                 override fun onError(exc: ImageCaptureException) {
                     Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
                     isSessionActive = true
+                    binding.captureOverlay.isSessionActive = true
                 }
             })
     }
@@ -171,6 +175,7 @@ class CaptureActivity : AppCompatActivity() {
 
     private fun finishCapture() {
         binding.txtStatus.text = "Stitching..."
+        binding.captureOverlay.visibility = View.GONE
         // TODO: Add stitchingProgress to the layout
         // binding.stitchingProgress.visibility = View.VISIBLE
 
@@ -192,6 +197,7 @@ class CaptureActivity : AppCompatActivity() {
                     ).show()
                     binding.btnStart.visibility = View.VISIBLE
                     isSessionActive = false
+                    binding.captureOverlay.isSessionActive = false
                 }
             }
         }

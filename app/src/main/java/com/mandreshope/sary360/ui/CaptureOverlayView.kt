@@ -11,23 +11,16 @@ class CaptureOverlayView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
+    private val targetRingPaint = Paint().apply {
+        color = Color.parseColor("#B3FFFFFF") // Semi-transparent white
+        style = Paint.Style.STROKE
+        strokeWidth = 20f
+        isAntiAlias = true
+    }
+
     private val dotPaint = Paint().apply {
-        color = Color.WHITE
+        color = Color.parseColor("#5A9FF5") // Google Blue color
         style = Paint.Style.FILL
-        isAntiAlias = true
-    }
-
-    private val targetPaint = Paint().apply {
-        color = Color.GREEN
-        style = Paint.Style.STROKE
-        strokeWidth = 5f
-        isAntiAlias = true
-    }
-
-    private val crosshairPaint = Paint().apply {
-        color = Color.WHITE
-        style = Paint.Style.STROKE
-        strokeWidth = 3f
         isAntiAlias = true
     }
 
@@ -36,34 +29,43 @@ class CaptureOverlayView @JvmOverloads constructor(
     var targetYaw: Float = 0f
     var targetPitch: Float = 0f
     var isTargetReached: Boolean = false
+    var isSessionActive: Boolean = false
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
+        if (!isSessionActive) return
+
         val centerX = width / 2f
         val centerY = height / 2f
 
-        // Draw crosshair
-        canvas.drawLine(centerX - 50, centerY, centerX + 50, centerY, crosshairPaint)
-        canvas.drawLine(centerX, centerY - 50, centerX, centerY + 50, crosshairPaint)
+        // Mapping: 1 degree approx equals to a percentage of screen width to allow natural movement
+        val scale = width / 60f // Assuming a ~60 degree horizontal FOV
 
-        // Draw target dot based on relative angles
-        // Simple mapping: 1 degree = 20 pixels (tweak as needed)
-        val scale = 20f
-        val deltaYaw = normalizeAngle(targetYaw - currentYaw)
+        var deltaYaw = normalizeAngle(targetYaw - currentYaw)
+        // If phones are held in portrait, yaw corresponds to X. If held in landscape, we might need rotation. 
+        // We assume portrait for now and simple panning
+        
         val deltaPitch = targetPitch - currentPitch
 
         val targetX = centerX + deltaYaw * scale
-        val targetY = centerY - deltaPitch * scale // Screen Y is inverted
+        val targetY = centerY - deltaPitch * scale // Screen Y is inverted, pitch up means negative delta Y? 
 
-        if (isTargetReached) {
-            dotPaint.color = Color.GREEN
-            canvas.drawCircle(centerX, centerY, 30f, dotPaint)
-        } else {
-            dotPaint.color = Color.WHITE
-            canvas.drawCircle(targetX, targetY, 20f, dotPaint)
-            canvas.drawCircle(centerX, centerY, 40f, targetPaint)
+        val ringRadius = 100f
+        val dotRadius = 75f
+
+        // Draw the target dot (blue circle)
+        if (!isTargetReached) {
+            canvas.drawCircle(targetX, targetY, dotRadius, dotPaint)
         }
+
+        // Draw the center white ring
+        if (isTargetReached) {
+            targetRingPaint.color = Color.parseColor("#4CAF50") // Turn green upon reaching target
+        } else {
+            targetRingPaint.color = Color.parseColor("#B3FFFFFF")
+        }
+        canvas.drawCircle(centerX, centerY, ringRadius, targetRingPaint)
     }
 
     private fun normalizeAngle(angle: Float): Float {
