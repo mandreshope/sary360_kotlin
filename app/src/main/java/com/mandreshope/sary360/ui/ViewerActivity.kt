@@ -36,8 +36,8 @@ class ViewerActivity : AppCompatActivity() {
                     val dx = x - previousX
                     val dy = y - previousY
 
-                    renderer.yaw += dx * 0.1f
-                    renderer.pitch += dy * 0.1f
+                    renderer.yaw -= dx * 0.1f // Inverted to match natural sliding
+                    renderer.pitch -= dy * 0.1f // Inverted to match natural sliding
                     
                     // Clamp pitch to avoid flipping
                     if (renderer.pitch > 90f) renderer.pitch = 90f
