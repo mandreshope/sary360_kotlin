@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
+import android.util.Size
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -79,9 +80,10 @@ class CaptureActivity : AppCompatActivity() {
         // Lower ring 2 (-60 pitch, 3 photos)
         for (yaw in 0 until 360 step 120) shotPlan.add(ShotPoint(yaw.toFloat(), -60f))
         
-        // Zenith & Nadir
-        shotPlan.add(ShotPoint(0f, 90f))
-        shotPlan.add(ShotPoint(0f, -90f))
+        // Zenith (3 photos)
+        for (yaw in 0 until 360 step 120) shotPlan.add(ShotPoint(yaw.toFloat(), 85f))
+        // Nadir (3 photos)
+        for (yaw in 0 until 360 step 120) shotPlan.add(ShotPoint(yaw.toFloat(), -85f))
     }
 
     private fun startSession() {
@@ -109,7 +111,10 @@ class CaptureActivity : AppCompatActivity() {
             val preview = Preview.Builder().build().also {
                 it.setSurfaceProvider(binding.viewFinder.surfaceProvider)
             }
-            imageCapture = ImageCapture.Builder().build()
+            // Limit capture resolution to speed up stitching of 56 images
+            imageCapture = ImageCapture.Builder()
+                .setTargetResolution(Size(1280, 960))
+                .build()
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
             try {
@@ -197,6 +202,17 @@ class CaptureActivity : AppCompatActivity() {
     private fun finishCapture() {
         binding.txtStatus.text = "Stitching..."
         binding.captureOverlay.visibility = View.GONE
+        
+        // Unbind the camera to prevent overheating and free up resources during stitching
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+        cameraProviderFuture.addListener({
+            try {
+                cameraProviderFuture.get().unbindAll()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to unbind camera", e)
+            }
+        }, ContextCompat.getMainExecutor(this))
+
         // TODO: Add stitchingProgress to the layout
         // binding.stitchingProgress.visibility = View.VISIBLE
 
@@ -219,6 +235,7 @@ class CaptureActivity : AppCompatActivity() {
                     binding.btnStart.visibility = View.VISIBLE
                     isSessionActive = false
                     binding.captureOverlay.isSessionActive = false
+                    startCamera() // Restart preview if user wants to try again
                 }
             }
         }

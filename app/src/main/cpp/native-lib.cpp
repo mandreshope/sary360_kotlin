@@ -2,6 +2,9 @@
 #include <jni.h>
 #include <opencv2/opencv.hpp>
 #include <opencv2/stitching.hpp>
+#include <opencv2/stitching/detail/blenders.hpp>
+#include <opencv2/stitching/detail/exposure_compensate.hpp>
+#include <opencv2/stitching/detail/seam_finders.hpp>
 #include <string>
 #include <vector>
 
@@ -75,8 +78,27 @@ Java_com_mandreshope_sary360_stitching_NativeStitcher_stitchImages(
   cv::Mat pano;
   cv::Ptr<cv::Stitcher> stitcher = cv::Stitcher::create(cv::Stitcher::PANORAMA);
 
-  // Configure stitcher for spherical mode (default for PANORAMA often works,
-  // but we can be explicit if using the detailed API)
+  // Force ORB with a low number of features (fast) instead of heavy default
+  // (possibly SIFT)
+  stitcher->setFeaturesFinder(cv::ORB::create(300));
+
+  // Configure stitcher for extreme performance (mandatory for 50+ images on
+  // Android)
+  stitcher->setRegistrationResol(0.2); // Very low for fast feature matching
+  stitcher->setSeamEstimationResol(0.1);
+  stitcher->setCompositingResol(0.6); // Compress final panorama to ~0.6
+                                      // Megapixels (~900x600) max internally
+  stitcher->setPanoConfidenceThresh(0.3); // High tolerance for missed linkages
+  stitcher->setWaveCorrection(
+      true); // RE-ENABLED: the panorama needs a straight horizon to make the
+             // sphere perfect!
+
+  // Massive speedups for many images (bypasses slow GraphCut processing):
+  stitcher->setSeamFinder(cv::makePtr<cv::detail::VoronoiSeamFinder>());
+  stitcher->setExposureCompensator(
+      cv::makePtr<cv::detail::NoExposureCompensator>());
+  stitcher->setBlender(
+      cv::makePtr<cv::detail::FeatherBlender>()); // Simpler blending
 
   LOGD("Starting stitching of %zu images...", imgs.size());
   cv::Stitcher::Status status = stitcher->stitch(imgs, pano);
