@@ -69,10 +69,16 @@ class CaptureActivity : AppCompatActivity() {
     private fun setupShotPlan() {
         // Horizon ring (0 pitch)
         for (yaw in 0 until 360 step 15) shotPlan.add(ShotPoint(yaw.toFloat(), 0f))
-        // Upper ring (+30 pitch)
+        // Upper ring 1 (+30 pitch)
         for (yaw in 0 until 360 step 30) shotPlan.add(ShotPoint(yaw.toFloat(), 30f))
-        // Lower ring (-30 pitch)
+        // Upper ring 2 (+60 pitch, 3 photos)
+        for (yaw in 0 until 360 step 120) shotPlan.add(ShotPoint(yaw.toFloat(), 60f))
+        
+        // Lower ring 1 (-30 pitch)
         for (yaw in 0 until 360 step 30) shotPlan.add(ShotPoint(yaw.toFloat(), -30f))
+        // Lower ring 2 (-60 pitch, 3 photos)
+        for (yaw in 0 until 360 step 120) shotPlan.add(ShotPoint(yaw.toFloat(), -60f))
+        
         // Zenith & Nadir
         shotPlan.add(ShotPoint(0f, 90f))
         shotPlan.add(ShotPoint(0f, -90f))
@@ -108,7 +114,8 @@ class CaptureActivity : AppCompatActivity() {
 
             try {
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture)
+                val camera = cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture)
+                camera.cameraControl.setLinearZoom(0f) // Zoom out all the way for wide-angle
             } catch (exc: Exception) {
                 Log.e(TAG, "Use case binding failed", exc)
             }
@@ -137,10 +144,10 @@ class CaptureActivity : AppCompatActivity() {
         val dp = Math.abs(p1 - p2)
         if (Math.abs(p2) >= 80f) {
             // Near zenith or nadir, yaw doesn't matter, just rely on pitch
-            return dp < 5f
+            return dp < 2.5f
         }
         val dy = Math.abs(normalizeAngle(y1 - y2))
-        return dy < 5f && dp < 5f
+        return dy < 2.5f && dp < 2.5f
     }
 
     private fun normalizeAngle(angle: Float): Float {

@@ -1,9 +1,9 @@
+#include <android/log.h>
 #include <jni.h>
-#include <string>
-#include <vector>
 #include <opencv2/opencv.hpp>
 #include <opencv2/stitching.hpp>
-#include <android/log.h>
+#include <string>
+#include <vector>
 
 #define TAG "Sary360Native"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, TAG, __VA_ARGS__)
@@ -12,75 +12,103 @@
 extern "C" {
 
 JNIEXPORT void JNICALL
-Java_com_mandreshope_sary360_renderer_SphereRenderer_drawFrame(JNIEnv *env, jobject thiz) {
-    // TODO: Implement rendering logic here
+Java_com_mandreshope_sary360_renderer_SphereRenderer_drawFrame(JNIEnv *env,
+                                                               jobject thiz) {
+  // TODO: Implement rendering logic here
 }
 
 JNIEXPORT void JNICALL
-Java_com_mandreshope_sary360_renderer_SphereRenderer_surfaceChanged(JNIEnv *env, jobject thiz, jint width,
-                                                                  jint height) {
-    // TODO: Implement surface changed logic here
+Java_com_mandreshope_sary360_renderer_SphereRenderer_surfaceChanged(
+    JNIEnv *env, jobject thiz, jint width, jint height) {
+  // TODO: Implement surface changed logic here
 }
 
 JNIEXPORT void JNICALL
-Java_com_mandreshope_sary360_renderer_SphereRenderer_surfaceCreated(JNIEnv *env, jobject thiz) {
-    // TODO: Implement surface created logic here
+Java_com_mandreshope_sary360_renderer_SphereRenderer_surfaceCreated(
+    JNIEnv *env, jobject thiz) {
+  // TODO: Implement surface created logic here
 }
 
 JNIEXPORT jint JNICALL
 Java_com_mandreshope_sary360_stitching_NativeStitcher_stitchImages(
-        JNIEnv* env,
-        jobject /* this */,
-        jobjectArray imagePaths,
-        jstring outputPath,
-        jfloat downscaleFactor) {
+    JNIEnv *env, jobject /* this */, jobjectArray imagePaths,
+    jstring outputPath, jfloat downscaleFactor) {
 
-    int numImages = env->GetArrayLength(imagePaths);
-    std::vector<cv::Mat> imgs;
+  int numImages = env->GetArrayLength(imagePaths);
+  std::vector<cv::Mat> imgs;
 
-    for (int i = 0; i < numImages; ++i) {
-        jstring pathStr = (jstring)env->GetObjectArrayElement(imagePaths, i);
-        const char* path = env->GetStringUTFChars(pathStr, nullptr);
+  cv::Ptr<cv::ORB> orb = cv::ORB::create();
 
-        cv::Mat img = cv::imread(path);
-        if (img.empty()) {
-            LOGE("Could not read image: %s", path);
-            env->ReleaseStringUTFChars(pathStr, path);
-            continue;
-        }
+  for (int i = 0; i < numImages; ++i) {
+    jstring pathStr = (jstring)env->GetObjectArrayElement(imagePaths, i);
+    const char *path = env->GetStringUTFChars(pathStr, nullptr);
 
-        // Downscale for performance during feature matching
-        if (downscaleFactor < 1.0f && downscaleFactor > 0.0f) {
-            cv::resize(img, img, cv::Size(), downscaleFactor, downscaleFactor);
-        }
-
-        imgs.push_back(img);
-        env->ReleaseStringUTFChars(pathStr, path);
+    cv::Mat img = cv::imread(path);
+    if (img.empty()) {
+      LOGE("Could not read image: %s", path);
+      env->ReleaseStringUTFChars(pathStr, path);
+      continue;
     }
 
-    if (imgs.size() < 2) {
-        return -1; // Not enough images to stitch
+    // Downscale for performance during feature matching
+    if (downscaleFactor < 1.0f && downscaleFactor > 0.0f) {
+      cv::resize(img, img, cv::Size(), downscaleFactor, downscaleFactor);
     }
 
-    cv::Mat pano;
-    cv::Ptr<cv::Stitcher> stitcher = cv::Stitcher::create(cv::Stitcher::PANORAMA);
-
-    // Configure stitcher for spherical mode (default for PANORAMA often works,
-    // but we can be explicit if using the detailed API)
-
-    LOGD("Starting stitching of %zu images...", imgs.size());
-    cv::Stitcher::Status status = stitcher->stitch(imgs, pano);
-
-    if (status != cv::Stitcher::OK) {
-        LOGE("Stitching failed with status: %d", static_cast<int>(status));
-        return static_cast<int>(status);
+    std::vector<cv::KeyPoint> keypoints;
+    orb->detect(img, keypoints);
+    if (keypoints.size() < 10) {
+      LOGE("Skipping image %s: too few features (%zu). Causes FLANN crash.",
+           path, keypoints.size());
+      env->ReleaseStringUTFChars(pathStr, path);
+      continue;
     }
 
-    const char* outPath = env->GetStringUTFChars(outputPath, nullptr);
-    bool success = cv::imwrite(outPath, pano);
-    env->ReleaseStringUTFChars(outputPath, outPath);
+    imgs.push_back(img);
+    env->ReleaseStringUTFChars(pathStr, path);
+  }
 
-    return success ? 0 : -2; // -2 if save fails
+  if (imgs.size() < 2) {
+    return -1; // Not enough images to stitch
+  }
+
+  cv::Mat pano;
+  cv::Ptr<cv::Stitcher> stitcher = cv::Stitcher::create(cv::Stitcher::PANORAMA);
+
+  // Configure stitcher for spherical mode (default for PANORAMA often works,
+  // but we can be explicit if using the detailed API)
+
+  LOGD("Starting stitching of %zu images...", imgs.size());
+  cv::Stitcher::Status status = stitcher->stitch(imgs, pano);
+
+  if (status != cv::Stitcher::OK) {
+    LOGE("Stitching failed with status: %d", static_cast<int>(status));
+    return static_cast<int>(status);
+  }
+
+  // Force 2:1 aspect ratio (equirectangular format) so OpenGL sphere doesn't
+  // stretch it vertically
+  int requiredHeight = pano.cols / 2;
+  if (pano.rows < requiredHeight) {
+    int paddingTotal = requiredHeight - pano.rows;
+    int paddingTop = paddingTotal / 2;
+    int paddingBottom = paddingTotal - paddingTop;
+    cv::copyMakeBorder(pano, pano, paddingTop, paddingBottom, 0, 0,
+                       cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+    LOGD("Padded image vertically by %d pixels to reach 2:1 eq-rectangular "
+         "ratio.",
+         paddingTotal);
+  } else if (pano.rows > requiredHeight) {
+    // Very rare, but if it's too tall, crop it
+    int extra = pano.rows - requiredHeight;
+    cv::Rect roi(0, extra / 2, pano.cols, requiredHeight);
+    pano = pano(roi);
+  }
+
+  const char *outPath = env->GetStringUTFChars(outputPath, nullptr);
+  bool success = cv::imwrite(outPath, pano);
+  env->ReleaseStringUTFChars(outputPath, outPath);
+
+  return success ? 0 : -2; // -2 if save fails
 }
-
 }

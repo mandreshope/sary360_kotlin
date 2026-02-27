@@ -54,8 +54,8 @@ class CaptureOverlayView @JvmOverloads constructor(
         val targetX = centerX + deltaYaw * scale
         val targetY = centerY - deltaPitch * scale // Screen Y is inverted, pitch up means negative delta Y? 
 
-        val ringRadius = 100f
-        val dotRadius = 75f
+        val ringRadius = 50f
+        val dotRadius = 37.5f
 
         // Draw the target dot (blue circle)
         if (!isTargetReached) {
